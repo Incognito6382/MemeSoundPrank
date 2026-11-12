@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Автоплеер Фонового Медиа</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          animation: {
+            'pulse-glow': 'pulseGlow 2s infinite ease-in-out',
+            'bounce-subtle': 'bounceSubtle 2s infinite ease-in-out',
+            'fade-in': 'fadeIn 0.4s ease-out forwards',
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { transform: 'scale(1)', opacity: '0.9', boxShadow: '0 0 25px rgba(99, 102, 241, 0.4)' },
+              '50%': { transform: 'scale(1.05)', opacity: '1', boxShadow: '0 0 45px rgba(129, 140, 248, 0.8)' },
+            },
+            bounceSubtle: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-6px)' },
+            },
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'scale(0.98)' },
+              '100%': { opacity: '1', transform: 'scale(1)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(129, 140, 248, 0.8);
+    }
+  </style>
+</head>
+<body class="h-full w-full overflow-hidden select-none font-sans relative antialiased bg-slate-950 text-slate-100">
+
+  <!-- ==================== PLAYER VIEW (FULLSCREEN IMAGE & AUDIO) ==================== -->
+  <div id="playerView" class="hidden absolute inset-0 z-0 flex items-center justify-center overflow-hidden bg-black">
+    <!-- Image Display Container -->
+    <div id="imageDisplay" class="w-full h-full bg-center bg-no-repeat transition-all duration-700 bg-cover"></div>
+    
+    <!-- Top Control Bar (Subtle & Glassmorphism) -->
+    <div id="topControlBar" class="absolute top-4 right-4 z-20 flex items-center gap-3 opacity-30 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 bg-slate-900/70 backdrop-blur-md border border-slate-700/50 p-2 rounded-2xl shadow-2xl">
+      
+      <!-- Audio Visualizer Indicator / Play Pause Button -->
+      <button id="toggleAudioBtn" title="Воспроизвести / Пауза" class="p-2.5 rounded-xl hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition-colors flex items-center justify-center">
+        <svg id="iconPlaying" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <svg id="iconPaused" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+
+      <!-- Volume Max Badge -->
+      <div class="px-2.5 py-1 bg-indigo-950/80 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded-lg flex items-center gap-1.5" title="Громкость принудительно установлена на 100%">
+        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+        </svg>
+        <span>100%</span>
+      </div>
+
+      <!-- Fullscreen Toggle Button -->
+      <button id="fullscreenBtn" title="Полноэкранный режим" class="p-2.5 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </svg>
+      </button>
+
+      <!-- Settings / Change Media Button -->
+      <button id="openSettingsBtn" title="Настройки и сброс медиа" class="p-2.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-white font-medium transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2 text-sm px-3.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span class="hidden sm:inline">Настройки</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== AUTOPLAY UNLOCK OVERLAY ==================== -->
+  <div id="unlockOverlay" class="hidden absolute inset-0 z-40 bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center cursor-pointer">
+    <div class="max-w-md w-full flex flex-col items-center gap-6 animate-fade-in">
+      <div class="w-24 h-24 rounded-full bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-400 animate-pulse-glow">
+        <svg class="w-12 h-12 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-2xl font-bold text-white">Включить звук и изображение</h2>
+        <p class="text-slate-300 text-sm">
+          Браузер заблокировал автовоспроизведение звука. Нажмите в любом месте экрана, чтобы запустить аудио на 100% громкости.
+        </p>
+      </div>
+
+      <button class="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-xl shadow-indigo-600/30 transition-transform transform hover:scale-105 active:scale-95">
+        Нажмите для старта 🔊
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== SETUP / MEDIA SELECTION MODAL ==================== -->
+  <div id="setupModal" class="absolute inset-0 z-30 flex items-center justify-center p-4 sm:p-6 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative my-auto animate-fade-in">
+      
+      <!-- Close Button (Only visible if existing media is playing) -->
+      <button id="closeSetupBtn" class="hidden absolute top-5 right-5 p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      <!-- Header -->
+      <div class="mb-6 text-center sm:text-left">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-3">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Персональный Автоплеер
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Выберите медиафайлы</h1>
+        <p class="text-slate-400 text-sm mt-1">
+          Загрузите картинку и аудиозапись с устройства. Они автоматически сохранятся в локальной памяти браузера и будут сразу воспроизводиться при следующем заходе.
+        </p>
+      </div>
+
+      <form id="mediaForm" class="space-y-6">
+        
+        <!-- Image Upload Field -->
+        <div class="space-y-2">
+          <label class="block text-sm font-semibold text-slate-200">
+            1. Фотка / Картинка (Фон)
+          </label>
+          <div id="imageDropArea" class="relative group border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-4 text-center cursor-pointer transition-all bg-slate-950/50 hover:bg-indigo-950/20 flex flex-col items-center justify-center min-h-[120px]">
+            <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+            <div id="imagePlaceholder" class="flex flex-col items-center gap-2 text-slate-400 group-hover:text-indigo-300">
+              <svg class="w-8 h-8 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-xs sm:text-sm font-medium">Нажмите или перетащите сюда изображение</span>
+            </div>
+            <!-- Image Selected Preview Badge -->
+            <div id="imagePreviewContainer" class="hidden w-full flex items-center gap-3 p-2 bg-slate-800/80 rounded-xl border border-slate-700">
+              <img id="imagePreview" src="" alt="Превью" class="w-12 h-12 object-cover rounded-lg border border-slate-600">
+              <div class="flex-1 text-left min-w-0">
+                <p id="imageFileName" class="text-xs font-semibold text-white truncate">image.jpg</p>
+                <p id="imageFileSize" class="text-[11px] text-slate-400">0 MB</p>
+              </div>
+              <span class="text-xs px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-md font-medium">Выбрано</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Image Fit Mode Option -->
+        <div class="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-xs sm:text-sm">
+          <span class="text-slate-300 font-medium">Режим отображения фото:</span>
+          <select id="fitModeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 text-xs font-medium">
+            <option value="cover">Заполнение (Cover)</option>
+            <option value="contain">Пропорционально (Contain)</option>
+          </select>
+        </div>
+
+        <!-- Audio Upload Field -->
+        <div class="space-y-2">
+          <label class="block text-sm font-semibold text-slate-200">
+            2. Аудиозапись / Звук
+          </label>
+          <div id="audioDropArea" class="relative group border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-4 text-center cursor-pointer transition-all bg-slate-950/50 hover:bg-indigo-950/20 flex flex-col items-center justify-center min-h-[120px]">
+            <input type="file" id="audioInput" accept="audio/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+            <div id="audioPlaceholder" class="flex flex-col items-center gap-2 text-slate-400 group-hover:text-indigo-300">
+              <svg class="w-8 h-8 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 .895-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 .895-2 3-2 3 .895 3 2zM9 10l12-2" />
+              </svg>
+              <span class="text-xs sm:text-sm font-medium">Нажмите или перетащите сюда аудиофайл (MP3, WAV, FLAC и др.)</span>
+            </div>
+            <!-- Audio Selected Preview Badge -->
+            <div id="audioPreviewContainer" class="hidden w-full flex items-center gap-3 p-2 bg-slate-800/80 rounded-xl border border-slate-700">
+              <div class="w-12 h-12 bg-indigo-600/30 border border-indigo-500/40 rounded-lg flex items-center justify-center text-indigo-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+              </div>
+              <div class="flex-1 text-left min-w-0">
+                <p id="audioFileName" class="text-xs font-semibold text-white truncate">sound.mp3</p>
+                <p id="audioFileSize" class="text-[11px] text-slate-400">0 MB</p>
+              </div>
+              <span class="text-xs px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-md font-medium">Выбрано</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Message Banner -->
+        <div id="statusBanner" class="hidden p-3 rounded-xl text-xs font-medium border"></div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          <button type="submit" id="saveBtn" class="w-full sm:flex-1 py-3.5 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Сохранить и Запустить</span>
+          </button>
+          
+          <button type="button" id="resetBtn" class="w-full sm:w-auto py-3.5 px-5 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/40 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm" title="Удалить сохраненные файлы из памяти браузера">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Сбросить</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Hidden HTML5 Audio Element -->
+  <audio id="audioPlayer" loop preload="auto"></audio>
+
+  <!-- JavaScript Logic -->
+  <script>
+    // ==================== INDEXEDDB ENGINE ====================
+    const DB_NAME = 'FullVolumeAutoPlayerDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'mediaStore';
+    const KEY = 'activeMedia';
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    async function saveMediaToDB(data) {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.put(data, KEY);
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    async function loadMediaFromDB() {
+      try {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(KEY);
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = (e) => reject(e.target.error);
+        });
+      } catch (err) {
+        console.error('Ошибка загрузки из IndexedDB:', err);
+        return null;
+      }
+    }
+
+    async function clearMediaDB() {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.delete(KEY);
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    // ==================== APPLICATION STATE & DOM ELEMENTS ====================
+    let currentSavedMedia = null;
+    let selectedImageFile = null;
+    let selectedAudioFile = null;
+    let imageObjectUrl = null;
+    let audioObjectUrl = null;
+
+    // Elements
+    const setupModal = document.getElementById('setupModal');
+    const closeSetupBtn = document.getElementById('closeSetupBtn');
+    const playerView = document.getElementById('playerView');
+    const unlockOverlay = document.getElementById('unlockOverlay');
+    const imageDisplay = document.getElementById('imageDisplay');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const mediaForm = document.getElementById('mediaForm');
+    
+    const imageInput = document.getElementById('imageInput');
+    const imagePlaceholder = document.getElementById('imagePlaceholder');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    const imageFileName = document.getElementById('imageFileName');
+    const imageFileSize = document.getElementById('imageFileSize');
+
+    const audioInput = document.getElementById('audioInput');
+    const audioPlaceholder = document.getElementById('audioPlaceholder');
+    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
+    const audioFileName = document.getElementById('audioFileName');
+    const audioFileSize = document.getElementById('audioFileSize');
+
+    const fitModeSelect = document.getElementById('fitModeSelect');
+    const statusBanner = document.getElementById('statusBanner');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // Controls
+    const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+    const iconPlaying = document.getElementById('iconPlaying');
+    const iconPaused = document.getElementById('iconPaused');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const openSettingsBtn = document.getElementById('openSettingsBtn');
+
+    // Helper: Format byte sizes
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Helper: Show notification banner
+    function showBanner(message, type = 'error') {
+      statusBanner.classList.remove('hidden', 'bg-red-950/60', 'border-red-700', 'text-red-200', 'bg-emerald-950/60', 'border-emerald-700', 'text-emerald-200');
+      if (type === 'error') {
+        statusBanner.classList.add('bg-red-950/60', 'border-red-700', 'text-red-200');
+      } else {
+        statusBanner.classList.add('bg-emerald-950/60', 'border-emerald-700', 'text-emerald-200');
+      }
+      statusBanner.textContent = message;
+    }
+
+    // ==================== FILE SELECTION & PREVIEWS ====================
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (!file.type.startsWith('image/')) {
+          showBanner('Пожалуйста, выберите корректный файл изображения!');
+          return;
+        }
+        selectedImageFile = file;
+        const tempUrl = URL.createObjectURL(file);
+        imagePreview.src = tempUrl;
+        imageFileName.textContent = file.name;
+        imageFileSize.textContent = formatBytes(file.size);
+        imagePlaceholder.classList.add('hidden');
+        imagePreviewContainer.classList.remove('hidden');
+        statusBanner.classList.add('hidden');
+      }
+    });
+
+    audioInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (!file.type.startsWith('audio/')) {
+          showBanner('Пожалуйста, выберите корректный аудиофайл!');
+          return;
+        }
+        selectedAudioFile = file;
+        audioFileName.textContent = file.name;
+        audioFileSize.textContent = formatBytes(file.size);
+        audioPlaceholder.classList.add('hidden');
+        audioPreviewContainer.classList.remove('hidden');
+        statusBanner.classList.add('hidden');
+      }
+    });
+
+    // ==================== FORM SUBMISSION ====================
+    mediaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Check if we have files (either newly selected or loaded from DB)
+      const imageToSave = selectedImageFile || (currentSavedMedia ? currentSavedMedia.imageBlob : null);
+      const audioToSave = selectedAudioFile || (currentSavedMedia ? currentSavedMedia.audioBlob : null);
+
+      if (!imageToSave || !audioToSave) {
+        showBanner('Необходимо выбрать и картинку, и аудиозапись перед сохранением!');
+        return;
+      }
+
+      try {
+        const displayMode = fitModeSelect.value;
+        const mediaData = {
+          imageBlob: imageToSave,
+          audioBlob: audioToSave,
+          imageName: imageToSave.name || 'image.jpg',
+          audioName: audioToSave.name || 'audio.mp3',
+          displayMode: displayMode,
+          updatedAt: Date.now()
+        };
+
+        await saveMediaToDB(mediaData);
+        currentSavedMedia = mediaData;
+        
+        // Hide setup modal, render player view and trigger playback
+        setupModal.classList.add('hidden');
+        launchPlayer(mediaData);
+
+      } catch (error) {
+        console.error(error);
+        showBanner('Ошибка при сохранении файлов в IndexedDB: ' + error.message);
+      }
+    });
+
+    // ==================== RESET MEDIA DATA ====================
+    resetBtn.addEventListener('click', async () => {
+      try {
+        await clearMediaDB();
+        currentSavedMedia = null;
+        selectedImageFile = null;
+        selectedAudioFile = null;
+        
+        // Reset Inputs & Preview DOM
+        imageInput.value = '';
+        audioInput.value = '';
+        imagePreviewContainer.classList.add('hidden');
+        imagePlaceholder.classList.remove('hidden');
+        audioPreviewContainer.classList.add('hidden');
+        audioPlaceholder.classList.remove('hidden');
+
+        // Stop Audio
+        audioPlayer.pause();
+        audioPlayer.src = '';
+
+        // UI toggles
+        playerView.classList.add('hidden');
+        unlockOverlay.classList.add('hidden');
+        closeSetupBtn.classList.add('hidden');
+        setupModal.classList.remove('hidden');
+
+        showBanner('Сохраненные медиафайлы успешно удалены.', 'success');
+      } catch (err) {
+        showBanner('Ошибка при сбросе данных: ' + err.message);
+      }
+    });
+
+    // Close Settings Modal (if media is active)
+    closeSetupBtn.addEventListener('click', () => {
+      if (currentSavedMedia) {
+        setupModal.classList.add('hidden');
+      }
+    });
+
+    openSettingsBtn.addEventListener('click', () => {
+      closeSetupBtn.classList.remove('hidden');
+      setupModal.classList.remove('hidden');
+    });
+
+    // ==================== LAUNCH PLAYER & AUTOPLAY HANDLING ====================
+    function launchPlayer(mediaData) {
+      playerView.classList.remove('hidden');
+
+      // 1. Prepare Fullscreen Image
+      if (imageObjectUrl) URL.revokeObjectURL(imageObjectUrl);
+      imageObjectUrl = URL.createObjectURL(mediaData.imageBlob);
+      imageDisplay.style.backgroundImage = `url("${imageObjectUrl}")`;
+      
+      if (mediaData.displayMode === 'contain') {
+        imageDisplay.style.backgroundSize = 'contain';
+      } else {
+        imageDisplay.style.backgroundSize = 'cover';
+      }
+
+      // 2. Prepare Audio (Force Max Volume = 1.0)
+      if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
+      audioObjectUrl = URL.createObjectURL(mediaData.audioBlob);
+      audioPlayer.src = audioObjectUrl;
+      audioPlayer.volume = 1.0;
+      audioPlayer.loop = true;
+
+      // 3. Attempt Autoplay at 100% Volume
+      attemptAudioPlay();
+    }
+
+    function attemptAudioPlay() {
+      // Continuously ensure volume stays maxed out
+      audioPlayer.volume = 1.0;
+      
+      const playPromise = audioPlayer.play();
+
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          // Playback succeeded! Hide unlock overlay
+          unlockOverlay.classList.add('hidden');
+          updateAudioUI(true);
+        }).catch((error) => {
+          // Autoplay policy prevented playback without interaction
+          console.log('Автовоспроизведение заблокировано браузером. Требуется клик пользователя.');
+          updateAudioUI(false);
+          showUnlockOverlay();
+        });
+      }
+    }
+
+    function showUnlockOverlay() {
+      unlockOverlay.classList.remove('hidden');
+    }
+
+    // Unlock on click anywhere on overlay
+    unlockOverlay.addEventListener('click', () => {
+      audioPlayer.volume = 1.0;
+      audioPlayer.play().then(() => {
+        unlockOverlay.classList.add('hidden');
+        updateAudioUI(true);
+      }).catch(err => {
+        console.error("Не удалось воспроизвести аудио при клике:", err);
+      });
+    });
+
+    // Audio State UI update
+    function updateAudioUI(isPlaying) {
+      if (isPlaying) {
+        iconPlaying.classList.remove('hidden');
+        iconPaused.classList.add('hidden');
+      } else {
+        iconPlaying.classList.add('hidden');
+        iconPaused.classList.remove('hidden');
+      }
+    }
+
+    toggleAudioBtn.addEventListener('click', () => {
+      audioPlayer.volume = 1.0;
+      if (audioPlayer.paused) {
+        audioPlayer.play();
+        updateAudioUI(true);
+      } else {
+        audioPlayer.pause();
+        updateAudioUI(false);
+      }
+    });
+
+    // Enforce volume 1.0 whenever volume change event fires
+    audioPlayer.addEventListener('volumechange', () => {
+      if (audioPlayer.volume !== 1.0) {
+        audioPlayer.volume = 1.0;
+      }
+    });
+
+    // Fullscreen Toggle Helper
+    fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.log(err));
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    });
+
+    // ==================== INITIALIZATION ON PAGE LOAD ====================
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const savedMedia = await loadMediaFromDB();
+        if (savedMedia && savedMedia.imageBlob && savedMedia.audioBlob) {
+          currentSavedMedia = savedMedia;
+          
+          // Pre-populate fit mode
+          if (savedMedia.displayMode) {
+            fitModeSelect.value = savedMedia.displayMode;
+          }
+
+          // Show existing preview badge info in setup modal
+          imageFileName.textContent = savedMedia.imageName || 'Сохраненное фото';
+          imageFileSize.textContent = formatBytes(savedMedia.imageBlob.size);
+          const tempImgUrl = URL.createObjectURL(savedMedia.imageBlob);
+          imagePreview.src = tempImgUrl;
+          imagePlaceholder.classList.add('hidden');
+          imagePreviewContainer.classList.remove('hidden');
+
+          audioFileName.textContent = savedMedia.audioName || 'Сохраненное аудио';
+          audioFileSize.textContent = formatBytes(savedMedia.audioBlob.size);
+          audioPlaceholder.classList.add('hidden');
+          audioPreviewContainer.classList.remove('hidden');
+
+          // Directly launch player mode
+          setupModal.classList.add('hidden');
+          launchPlayer(savedMedia);
+        } else {
+          // No media found: keep setup modal open
+          setupModal.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error("Ошибка инициализации приложения:", err);
+        setupModal.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
